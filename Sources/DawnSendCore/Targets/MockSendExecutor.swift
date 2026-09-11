@@ -1,6 +1,6 @@
 import Foundation
 
-/// Injected send pipeline for this stage. Prompt 3 replaces this with Accessibility automation.
+/// Test double for the send pipeline. Production uses `LocalSendPipeline`.
 public final class MockSendExecutor: SendExecuting, @unchecked Sendable {
     private let lock = NSLock()
     private var outcome: SendOutcome

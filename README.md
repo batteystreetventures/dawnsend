@@ -38,6 +38,12 @@ killall DawnSend
 
 ## Status
 
-The current tree includes the scheduler state machine, local operational persistence, native keep-awake assertions, and a menu-bar popover that can arm/disarm one mock schedule. Cross-app Send still arrives in a later stage.
+The current tree includes the scheduler, native keep-awake assertions, and a local Send pipeline for Codex, Cursor, and Claude Cowork. The menu-bar experience is still a later stage.
+
+Diagnose detected apps without sending:
+
+```sh
+./dist/DawnSend.app/Contents/MacOS/DawnSend --diagnose
+```
 
 See `PromptDocs/` for the staged build plan. Those documents stay in the repository throughout development.

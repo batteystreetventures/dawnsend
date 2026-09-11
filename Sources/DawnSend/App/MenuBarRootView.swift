@@ -22,6 +22,23 @@ struct MenuBarRootView: View {
         }
         .padding(16)
         .frame(width: 320, alignment: .leading)
+        .onAppear {
+            controller.refreshPermission()
+        }
+        .confirmationDialog(
+            ImmediateSend.confirmationTitle,
+            isPresented: $controller.confirmTestSend,
+            titleVisibility: .visible
+        ) {
+            Button("Send now") {
+                Task {
+                    await controller.sendNow()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(ImmediateSend.confirmationMessage(for: controller.selectedTarget))
+        }
     }
 
     private var header: some View {
@@ -130,28 +147,60 @@ struct MenuBarRootView: View {
                     .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            if controller.accessibilityStatus != .trusted {
+                Text(controller.accessibilityStatus.userFacingSummary)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let outcome = controller.lastImmediateOutcome {
+                Text(immediateOutcomeText(outcome))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
     private var actionButtons: some View {
-        HStack {
-            Button("Arm") {
-                controller.arm()
-            }
-            .disabled(!controller.canArm)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Button("Arm") {
+                    controller.arm()
+                }
+                .disabled(!controller.canArm)
 
-            Button("Disarm", role: .destructive) {
-                controller.disarm()
+                Button("Disarm", role: .destructive) {
+                    controller.disarm()
+                }
+                .disabled(!controller.canDisarm)
             }
-            .disabled(!controller.canDisarm)
+            Button(controller.isTestSending ? "Sending…" : "Test Send") {
+                controller.confirmTestSend = true
+            }
+            .disabled(!controller.canTestSend)
+
+            if controller.accessibilityStatus != .trusted {
+                HStack {
+                    Button("Grant Accessibility") {
+                        controller.requestAccessibility()
+                    }
+                    Button("Open Settings") {
+                        controller.openAccessibilitySettings()
+                    }
+                }
+            }
         }
     }
 
     private var footnotes: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Send is simulated in this build.")
+            Text("DawnSend submits the focused draft. It never types or stores your prompt.")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
             Text(LidClosedCapability.userFacingLimitation)
                 .font(.caption)
                 .foregroundStyle(.tertiary)
@@ -168,11 +217,22 @@ struct MenuBarRootView: View {
         case .sending:
             return "Sending"
         case .sent:
-            return "Sent (simulated)"
+            return "Sent"
         case .missed:
             return "Missed"
         case .failed:
             return "Failed"
+        }
+    }
+
+    private func immediateOutcomeText(_ outcome: SendOutcome) -> String {
+        switch outcome {
+        case .verifiedSent:
+            return "Test Send: verified."
+        case .issuedButNotVerifiable:
+            return "Test Send: submit issued, not verifiable."
+        case .failed(let message):
+            return "Test Send failed: \(message)"
         }
     }
 }

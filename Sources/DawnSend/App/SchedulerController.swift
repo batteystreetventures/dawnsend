@@ -4,6 +4,8 @@ import Foundation
 
 final class SchedulerController: ObservableObject {
     let scheduler: SendScheduler
+    private let immediateSend: ImmediateSending
+    private let permission: AccessibilityPermissionManaging
 
     @Published private(set) var snapshot: SchedulerSnapshot
     @Published var selectedTarget: TargetKind = .cursor
@@ -13,10 +15,21 @@ final class SchedulerController: ObservableObject {
     @Published var minutes = 2
     @Published var exactDate = Date().addingTimeInterval(120)
     @Published var armErrorMessage: String?
+    @Published var accessibilityStatus: AccessibilityTrustStatus = .notDeterminedOrDenied
+    @Published var lastImmediateOutcome: SendOutcome?
+    @Published var isTestSending = false
+    @Published var confirmTestSend = false
 
-    init(scheduler: SendScheduler) {
+    init(
+        scheduler: SendScheduler,
+        immediateSend: ImmediateSending,
+        permission: AccessibilityPermissionManaging
+    ) {
         self.scheduler = scheduler
+        self.immediateSend = immediateSend
+        self.permission = permission
         self.snapshot = scheduler.snapshot
+        self.accessibilityStatus = permission.status()
         if let target = scheduler.selectedTarget {
             selectedTarget = target
         }
@@ -38,6 +51,19 @@ final class SchedulerController: ObservableObject {
         if snapshot.status != .idle {
             armErrorMessage = nil
         }
+    }
+
+    func refreshPermission() {
+        accessibilityStatus = permission.status()
+    }
+
+    func requestAccessibility() {
+        permission.requestTrust()
+        refreshPermission()
+    }
+
+    func openAccessibilitySettings() {
+        permission.openPrivacySettings()
     }
 
     func arm() {
@@ -69,6 +95,20 @@ final class SchedulerController: ObservableObject {
         refresh()
     }
 
+    func sendNow() async {
+        await MainActor.run {
+            isTestSending = true
+            lastImmediateOutcome = nil
+        }
+        let outcome = await immediateSend.sendNow(to: selectedTarget)
+        await MainActor.run {
+            lastImmediateOutcome = outcome
+            isTestSending = false
+            refresh()
+            refreshPermission()
+        }
+    }
+
     var canArm: Bool {
         switch snapshot.status {
         case .idle, .sent, .missed, .failed:
@@ -88,6 +128,10 @@ final class SchedulerController: ObservableObject {
             || snapshot.status == .sent
             || snapshot.status == .failed
             || snapshot.status == .missed
+    }
+
+    var canTestSend: Bool {
+        snapshot.status != .sending && !isTestSending
     }
 }
 

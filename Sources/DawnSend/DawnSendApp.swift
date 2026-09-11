@@ -20,8 +20,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        if CommandLine.arguments.contains("--diagnose") {
+            let report = services.diagnosticsSnapshot().printableDescription
+            FileHandle.standardOutput.write(Data(report.utf8))
+            if !report.hasSuffix("\n") {
+                FileHandle.standardOutput.write(Data("\n".utf8))
+            }
+            exit(0)
+        }
         services.scheduler.restorePersistedState()
         services.controller.refresh()
+        services.controller.refreshPermission()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

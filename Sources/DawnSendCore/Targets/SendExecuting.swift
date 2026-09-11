@@ -1,4 +1,4 @@
-/// Cross-app send pipeline seam. Real Accessibility automation arrives later.
+/// Cross-app send pipeline seam. Scheduled sends and Test Send share this method.
 public protocol SendExecuting: Sendable {
     func send(to target: TargetKind) async -> SendOutcome
 }

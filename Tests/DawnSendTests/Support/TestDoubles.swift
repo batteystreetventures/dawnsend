@@ -94,7 +94,7 @@ struct SchedulerHarness {
     let timer: ManualTimerScheduler
     let store: InMemoryStateStore
     let power: FakePowerAssertionManager
-    let sendExecutor: MockSendExecutor
+    let sendExecutor: RecordingSendExecutor
     let notifier: RecordingUserNotifier
     let scheduler: SendScheduler
 
@@ -102,11 +102,13 @@ struct SchedulerHarness {
         now: Date = Date(timeIntervalSince1970: 1_700_000_000),
         store: InMemoryStateStore = InMemoryStateStore(),
         sendOutcome: SendOutcome = .verifiedSent,
-        power: FakePowerAssertionManager = FakePowerAssertionManager()
+        power: FakePowerAssertionManager = FakePowerAssertionManager(),
+        innerSendExecutor: (any SendExecuting)? = nil
     ) -> SchedulerHarness {
         let clock = ControllableClock(now: now)
         let timer = ManualTimerScheduler()
-        let sendExecutor = MockSendExecutor(outcome: sendOutcome)
+        let inner = innerSendExecutor ?? MockSendExecutor(outcome: sendOutcome)
+        let sendExecutor = RecordingSendExecutor(inner: inner)
         let notifier = RecordingUserNotifier()
         let scheduler = SendScheduler(
             clock: clock,
