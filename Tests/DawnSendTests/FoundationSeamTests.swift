@@ -58,27 +58,15 @@ final class FoundationSeamTests: XCTestCase {
 
     func testFixedClockReturnsInjectedNow() {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
-        let clock = FixedClock(now: now)
+        let clock = ControllableClock(now: now)
         XCTAssertEqual(clock.now, now)
     }
-}
 
-private struct FixedClock: Clock {
-    var now: Date
-}
-
-private final class InMemoryStateStore: StatePersisting {
-    private var state: PersistedScheduleState?
-
-    func load() throws -> PersistedScheduleState? {
-        state
-    }
-
-    func save(_ state: PersistedScheduleState) throws {
-        self.state = state
-    }
-
-    func clear() throws {
-        state = nil
+    func testPostSendKeepAwakeChoices() {
+        XCTAssertEqual(
+            PostSendKeepAwake.allCases,
+            [.off, .oneHour, .fiveHours, .untilDisarmed]
+        )
+        XCTAssertEqual(PostSendKeepAwake.default, .fiveHours)
     }
 }

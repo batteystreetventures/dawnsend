@@ -9,18 +9,39 @@ public struct PersistedScheduleState: Codable, Equatable, Sendable {
     public var deadline: Date?
     public var status: ScheduleStatus
     public var postSendKeepAwake: PostSendKeepAwake
+    public var sendAttempted: Bool
+    public var postSendEndsAt: Date?
+    public var lastErrorMessage: String?
 
     public init(
         schemaVersion: Int = PersistedScheduleState.currentSchemaVersion,
         target: TargetKind? = nil,
         deadline: Date? = nil,
         status: ScheduleStatus = .idle,
-        postSendKeepAwake: PostSendKeepAwake = .default
+        postSendKeepAwake: PostSendKeepAwake = .default,
+        sendAttempted: Bool = false,
+        postSendEndsAt: Date? = nil,
+        lastErrorMessage: String? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.target = target
         self.deadline = deadline
         self.status = status
         self.postSendKeepAwake = postSendKeepAwake
+        self.sendAttempted = sendAttempted
+        self.postSendEndsAt = postSendEndsAt
+        self.lastErrorMessage = lastErrorMessage
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
+        target = try container.decodeIfPresent(TargetKind.self, forKey: .target)
+        deadline = try container.decodeIfPresent(Date.self, forKey: .deadline)
+        status = try container.decode(ScheduleStatus.self, forKey: .status)
+        postSendKeepAwake = try container.decodeIfPresent(PostSendKeepAwake.self, forKey: .postSendKeepAwake) ?? .default
+        sendAttempted = try container.decodeIfPresent(Bool.self, forKey: .sendAttempted) ?? false
+        postSendEndsAt = try container.decodeIfPresent(Date.self, forKey: .postSendEndsAt)
+        lastErrorMessage = try container.decodeIfPresent(String.self, forKey: .lastErrorMessage)
     }
 }

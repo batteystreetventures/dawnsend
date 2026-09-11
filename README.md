@@ -24,7 +24,7 @@ From a clean checkout:
 
 The build script writes `dist/DawnSend.app` (display name DawnSend, bundle identifier `app.dawnsend`, no Dock icon).
 
-Open the placeholder menu-bar app:
+Open the menu-bar app:
 
 ```sh
 open dist/DawnSend.app
@@ -38,6 +38,6 @@ killall DawnSend
 
 ## Status
 
-The current tree is the foundation: a launchable menu-bar placeholder, architecture seams for scheduling, power assertions, target automation, persistence, and notifications, plus local scripts and GitHub Actions CI.
+The current tree includes the scheduler state machine, local operational persistence, native keep-awake assertions, and a menu-bar popover that can arm/disarm one mock schedule. Cross-app Send still arrives in a later stage.
 
 See `PromptDocs/` for the staged build plan. Those documents stay in the repository throughout development.
