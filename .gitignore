@@ -1,0 +1,40 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+# Swift / Xcode
+.build/
+.swiftpm/
+DerivedData/
+dist/
+*.app
+*.dSYM
+*.dSYM.zip
+xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.moved-aside
+*.hmap
+*.ipa
+*.swp
+
+# Secrets and local credentials
+.env
+.env.*
+!.env.example
+*.p12
+*.cer
+*.certSigningRequest
+*.mobileprovision
+*.provisionprofile
+*.keychain
+*.pem
+AuthKey_*.p8
+secrets/
+credentials.json
+
+# Logs
+*.log
