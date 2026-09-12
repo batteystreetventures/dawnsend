@@ -40,7 +40,8 @@ final class AppServices {
         self.controller = SchedulerController(
             scheduler: scheduler,
             immediateSend: immediateSend,
-            permission: permission
+            permission: permission,
+            notifier: notifier
         )
         self.clockMonitor = SystemClockChangeMonitor { [weak scheduler] in
             scheduler?.handleClockOrTimeZoneChange()

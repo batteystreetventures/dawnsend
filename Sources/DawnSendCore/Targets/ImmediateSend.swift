@@ -5,7 +5,7 @@ public enum ImmediateSend: Sendable {
     public static let confirmationTitle = "Send the focused draft now?"
 
     public static func confirmationMessage(for target: TargetKind) -> String {
-        "DawnSend will submit the draft already focused in \(target.displayName). It will not type, paste, or read that prompt into storage. Continue only if that draft is the message you intend to send."
+        "DawnSend will bring \(target.displayName) forward and submit the draft already in its composer. It will not type, paste, or store that prompt. Continue only if that draft is the message you intend to send."
     }
 }
 

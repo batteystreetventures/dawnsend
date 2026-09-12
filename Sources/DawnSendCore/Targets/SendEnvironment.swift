@@ -65,6 +65,8 @@ public protocol SendEnvironment: Sendable {
     func resolve(_ definition: TargetDefinition) -> ResolvedApplication?
     func activate(bundleIdentifier: String) async -> ActivationOutcome
     func inspectComposer(processIdentifier: Int32) -> ComposerInspection
+    /// Restores focus to an editable composer in the already-open window. Does not navigate conversations or click by coordinates.
+    func restoreComposerFocus(processIdentifier: Int32) -> Bool
     func postReturnKey(processIdentifier: Int32) -> KeySubmitResult
     func pressSendButton(processIdentifier: Int32, titles: [String]) -> ButtonPressResult
     func sleep(seconds: TimeInterval) async
@@ -73,14 +75,33 @@ public protocol SendEnvironment: Sendable {
 public struct SendPipelineTiming: Equatable, Sendable {
     public var postSubmitAttempts: Int
     public var postSubmitInterval: TimeInterval
+    public var composerFocusAttempts: Int
+    public var composerFocusInterval: TimeInterval
 
-    public init(postSubmitAttempts: Int, postSubmitInterval: TimeInterval) {
+    public init(
+        postSubmitAttempts: Int,
+        postSubmitInterval: TimeInterval,
+        composerFocusAttempts: Int = 1,
+        composerFocusInterval: TimeInterval = 0
+    ) {
         self.postSubmitAttempts = postSubmitAttempts
         self.postSubmitInterval = postSubmitInterval
+        self.composerFocusAttempts = composerFocusAttempts
+        self.composerFocusInterval = composerFocusInterval
     }
 
-    public static let production = SendPipelineTiming(postSubmitAttempts: 8, postSubmitInterval: 0.15)
-    public static let immediate = SendPipelineTiming(postSubmitAttempts: 1, postSubmitInterval: 0)
+    public static let production = SendPipelineTiming(
+        postSubmitAttempts: 8,
+        postSubmitInterval: 0.15,
+        composerFocusAttempts: 8,
+        composerFocusInterval: 0.1
+    )
+    public static let immediate = SendPipelineTiming(
+        postSubmitAttempts: 1,
+        postSubmitInterval: 0,
+        composerFocusAttempts: 1,
+        composerFocusInterval: 0
+    )
 }
 
 enum ComposerChange: Equatable {

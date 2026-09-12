@@ -95,6 +95,8 @@ final class FakeSendEnvironment: SendEnvironment, @unchecked Sendable {
     var coordinateClickCount = 0
     var pressedTitles: [String] = []
     var resolveCount = 0
+    var restoreCount = 0
+    var restoreResult = false
 
     func resolve(_ definition: TargetDefinition) -> ResolvedApplication? {
         resolveCount += 1
@@ -115,6 +117,12 @@ final class FakeSendEnvironment: SendEnvironment, @unchecked Sendable {
             return fallbackInspection
         }
         return inspections.removeFirst()
+    }
+
+    func restoreComposerFocus(processIdentifier: Int32) -> Bool {
+        restoreCount += 1
+        _ = processIdentifier
+        return restoreResult
     }
 
     func postReturnKey(processIdentifier: Int32) -> KeySubmitResult {

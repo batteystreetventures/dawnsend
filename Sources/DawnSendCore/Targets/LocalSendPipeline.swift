@@ -57,7 +57,7 @@ public final class LocalSendPipeline: SendExecuting, @unchecked Sendable {
             return .failed(.notRunning(target: target))
         }
 
-        let before = environment.inspectComposer(processIdentifier: activePID)
+        let before = await focusedComposerAfterActivation(pid: activePID)
         guard before.hasFocusedComposer else {
             return .failed(.noFocusedComposer(target: target))
         }
@@ -130,6 +130,30 @@ public final class LocalSendPipeline: SendExecuting, @unchecked Sendable {
             contentUnreadable: contentUnreadable,
             target: target
         )
+    }
+
+    private func focusedComposerAfterActivation(pid: Int32) async -> ComposerInspection {
+        _ = environment.restoreComposerFocus(processIdentifier: pid)
+        if timing.composerFocusInterval > 0 {
+            await environment.sleep(seconds: timing.composerFocusInterval)
+        }
+        var before = environment.inspectComposer(processIdentifier: pid)
+        if before.hasFocusedComposer {
+            return before
+        }
+
+        let attempts = max(1, timing.composerFocusAttempts)
+        for _ in 0..<attempts {
+            if timing.composerFocusInterval > 0 {
+                await environment.sleep(seconds: timing.composerFocusInterval)
+            }
+            _ = environment.restoreComposerFocus(processIdentifier: pid)
+            before = environment.inspectComposer(processIdentifier: pid)
+            if before.hasFocusedComposer {
+                return before
+            }
+        }
+        return before
     }
 
     private func pressButton(pid: Int32, titles: [String]) -> ButtonPressResult {

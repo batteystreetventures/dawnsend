@@ -95,6 +95,7 @@ final class SendSchedulerPipelineIntegrationTests: XCTestCase {
             XCTAssertFalse(source.contains("CGPoint(x:"))
         }
         XCTAssertTrue(automationSource.contains("AXUIElementPerformAction"))
+        XCTAssertTrue(automationSource.contains("cghidEventTap"))
         XCTAssertTrue(pipelineSource.contains("pressSendButton"))
     }
 

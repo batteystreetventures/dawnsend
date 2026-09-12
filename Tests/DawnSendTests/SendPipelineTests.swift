@@ -52,6 +52,31 @@ final class SendPipelineTests: XCTestCase {
         XCTAssertEqual(outcome, .failed(.noFocusedComposer(target: .cursor)))
         XCTAssertEqual(env.returnCount, 0)
         XCTAssertEqual(env.buttonCount, 0)
+        XCTAssertEqual(env.restoreCount, 2)
+    }
+
+    func testRestoresComposerFocusWhenFirstInspectMisses() async {
+        let env = FakeSendEnvironment()
+        env.resolved = PipelineFixtures.runningCursor()
+        env.restoreResult = true
+        env.inspections = [
+            .missing,
+            PipelineFixtures.focusedDraft,
+            PipelineFixtures.clearedDraft
+        ]
+        env.fallbackInspection = PipelineFixtures.clearedDraft
+        let outcome = await pipeline(env).send(to: .cursor)
+        XCTAssertEqual(outcome, .verifiedSent)
+        XCTAssertGreaterThanOrEqual(env.restoreCount, 1)
+        XCTAssertEqual(env.returnCount, 1)
+        XCTAssertEqual(env.coordinateClickCount, 0)
+    }
+
+    func testRestoresComposerAfterActivationEvenIfInspectable() async {
+        let env = PipelineFixtures.successfulEnvironment()
+        let outcome = await pipeline(env).send(to: .cursor)
+        XCTAssertEqual(outcome, .verifiedSent)
+        XCTAssertEqual(env.restoreCount, 1)
     }
 
     func testEmptyComposerWhenValueIsReadable() async {
@@ -170,7 +195,7 @@ final class SendPipelineTests: XCTestCase {
         let outcome = await immediate.sendNow(to: .cursor)
         XCTAssertEqual(outcome, .verifiedSent)
         XCTAssertEqual(notifier.events, [.verifiedSent(target: .cursor)])
-        XCTAssertTrue(ImmediateSend.confirmationMessage(for: .cursor).contains("focused"))
+        XCTAssertTrue(ImmediateSend.confirmationMessage(for: .cursor).contains("composer"))
         XCTAssertFalse(ImmediateSend.confirmationMessage(for: .cursor).lowercased().contains("clipboard"))
     }
 
@@ -243,6 +268,11 @@ final class BlockingSendEnvironment: SendEnvironment, @unchecked Sendable {
     func inspectComposer(processIdentifier: Int32) -> ComposerInspection {
         _ = processIdentifier
         return PipelineFixtures.focusedDraft
+    }
+
+    func restoreComposerFocus(processIdentifier: Int32) -> Bool {
+        _ = processIdentifier
+        return false
     }
 
     func postReturnKey(processIdentifier: Int32) -> KeySubmitResult {

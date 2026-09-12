@@ -152,6 +152,10 @@ public final class SendScheduler: Scheduling {
 
         acquirePowerAssertion()
         emitChange()
+        let notifier = notifier
+        Task { @MainActor in
+            await notifier.requestAuthorizationIfNeeded()
+        }
     }
 
     public func disarm() {

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import UserNotifications
 
@@ -16,23 +17,34 @@ public final class SystemUserNotifier: NSObject, UserNotifying, UNUserNotificati
         guard settings.authorizationStatus == .notDetermined else {
             return
         }
+        await MainActor.run {
+            NSApp.activate(ignoringOtherApps: true)
+        }
         _ = try? await center.requestAuthorization(options: [.alert, .sound])
     }
 
     public func notify(_ event: UserNotificationEvent) {
-        Task {
-            await requestAuthorizationIfNeeded()
-            let content = UNMutableNotificationContent()
-            content.title = AppIdentity.displayName
-            content.body = event.body
-            content.sound = .default
-            let request = UNNotificationRequest(
-                identifier: "dawnsend.\(UUID().uuidString)",
-                content: content,
-                trigger: nil
-            )
-            try? await center.add(request)
+        Task { @MainActor [weak self] in
+            await self?.deliver(event)
         }
+    }
+
+    @MainActor
+    private func deliver(_ event: UserNotificationEvent) async {
+        await requestAuthorizationIfNeeded()
+        let content = UNMutableNotificationContent()
+        content.title = AppIdentity.displayName
+        content.body = event.body
+        content.sound = .default
+        if #available(macOS 12.0, *) {
+            content.interruptionLevel = .active
+        }
+        let request = UNNotificationRequest(
+            identifier: "dawnsend.\(UUID().uuidString)",
+            content: content,
+            trigger: nil
+        )
+        try? await center.add(request)
     }
 
     public func userNotificationCenter(

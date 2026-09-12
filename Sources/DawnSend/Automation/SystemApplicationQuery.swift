@@ -46,7 +46,9 @@ enum ApplicationActivation {
         }
 
         await MainActor.run {
+            dismissDawnSendSurfaces()
             if #available(macOS 14.0, *) {
+                NSApp.yieldActivation(to: running)
                 _ = running.activate()
             } else {
                 _ = running.activate(options: [.activateIgnoringOtherApps])
@@ -64,5 +66,16 @@ enum ApplicationActivation {
             try? await Task.sleep(nanoseconds: 50_000_000)
         }
         return .timedOut
+    }
+
+    @MainActor
+    private static func dismissDawnSendSurfaces() {
+        for window in NSApp.windows where window.isVisible {
+            let typeName = String(describing: type(of: window))
+            if typeName.contains("StatusBar") {
+                continue
+            }
+            window.orderOut(nil)
+        }
     }
 }

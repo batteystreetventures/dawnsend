@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import DawnSendCore
 import Foundation
@@ -6,6 +7,7 @@ final class SchedulerController: ObservableObject {
     let scheduler: SendScheduler
     private let immediateSend: ImmediateSending
     private let permission: AccessibilityPermissionManaging
+    private let notifier: UserNotifying
 
     @Published private(set) var snapshot: SchedulerSnapshot
     @Published var selectedTarget: TargetKind = .cursor
@@ -23,11 +25,13 @@ final class SchedulerController: ObservableObject {
     init(
         scheduler: SendScheduler,
         immediateSend: ImmediateSending,
-        permission: AccessibilityPermissionManaging
+        permission: AccessibilityPermissionManaging,
+        notifier: UserNotifying
     ) {
         self.scheduler = scheduler
         self.immediateSend = immediateSend
         self.permission = permission
+        self.notifier = notifier
         self.snapshot = scheduler.snapshot
         self.accessibilityStatus = permission.status()
         if let target = scheduler.selectedTarget {
@@ -83,6 +87,9 @@ final class SchedulerController: ObservableObject {
                 postSendKeepAwake: postSendKeepAwake
             )
             refresh()
+            Task { @MainActor in
+                await notifier.requestAuthorizationIfNeeded()
+            }
         } catch let error as ArmError {
             armErrorMessage = error.userMessage
         } catch {
@@ -99,14 +106,35 @@ final class SchedulerController: ObservableObject {
         await MainActor.run {
             isTestSending = true
             lastImmediateOutcome = nil
+            confirmTestSend = false
         }
+        try? await Task.sleep(nanoseconds: 250_000_000)
         let outcome = await immediateSend.sendNow(to: selectedTarget)
         await MainActor.run {
             lastImmediateOutcome = outcome
             isTestSending = false
             refresh()
             refreshPermission()
+            presentTestSendResult(outcome)
         }
+    }
+
+    private func presentTestSendResult(_ outcome: SendOutcome) {
+        let alert = NSAlert()
+        alert.messageText = "Test Send"
+        switch outcome {
+        case .verifiedSent:
+            alert.alertStyle = .informational
+            alert.informativeText = "DawnSend verified that the draft was submitted."
+        case .issuedButNotVerifiable:
+            alert.alertStyle = .informational
+            alert.informativeText = "DawnSend issued Submit, but could not verify it from the accessibility tree. Check the chat to confirm."
+        case .failed(let message):
+            alert.alertStyle = .warning
+            alert.informativeText = message
+        }
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     var canArm: Bool {

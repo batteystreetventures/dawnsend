@@ -38,6 +38,10 @@ public final class SystemSendEnvironment: SendEnvironment, @unchecked Sendable {
         SystemAccessibilityAutomation.inspectComposer(processIdentifier: processIdentifier)
     }
 
+    public func restoreComposerFocus(processIdentifier: Int32) -> Bool {
+        SystemAccessibilityAutomation.restoreComposerFocus(processIdentifier: processIdentifier)
+    }
+
     public func postReturnKey(processIdentifier: Int32) -> KeySubmitResult {
         SystemAccessibilityAutomation.postReturnKey(processIdentifier: processIdentifier)
     }

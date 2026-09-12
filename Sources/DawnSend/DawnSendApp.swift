@@ -1,6 +1,7 @@
 import AppKit
 import DawnSendCore
 import SwiftUI
+import UserNotifications
 
 @main
 struct DawnSendApp: App {
@@ -26,7 +27,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if !report.hasSuffix("\n") {
                 FileHandle.standardOutput.write(Data("\n".utf8))
             }
-            exit(0)
+            Task {
+                let settings = await UNUserNotificationCenter.current().notificationSettings()
+                let line: String
+                switch settings.authorizationStatus {
+                case .authorized, .provisional, .ephemeral:
+                    line = "Notifications: authorized"
+                case .denied:
+                    line = "Notifications: denied (System Settings › Notifications › DawnSend)"
+                case .notDetermined:
+                    line = "Notifications: not determined (asked once on Arm or Test Send)"
+                @unknown default:
+                    line = "Notifications: unknown"
+                }
+                FileHandle.standardOutput.write(Data("\(line)\n".utf8))
+                exit(0)
+            }
+            return
         }
         services.scheduler.restorePersistedState()
         services.controller.refresh()
