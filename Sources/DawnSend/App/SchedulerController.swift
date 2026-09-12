@@ -1,4 +1,3 @@
-import AppKit
 import Combine
 import DawnSendCore
 import Foundation
@@ -8,6 +7,8 @@ final class SchedulerController: ObservableObject {
     private let immediateSend: ImmediateSending
     private let permission: AccessibilityPermissionManaging
     private let notifier: UserNotifying
+    private let query: ApplicationQuerying
+    private let firstRun: FirstRunPersisting
 
     @Published private(set) var snapshot: SchedulerSnapshot
     @Published var selectedTarget: TargetKind = .cursor
@@ -21,19 +22,28 @@ final class SchedulerController: ObservableObject {
     @Published var lastImmediateOutcome: SendOutcome?
     @Published var isTestSending = false
     @Published var confirmTestSend = false
+    @Published var confirmImminentArm = false
+    @Published var testSendAlert: TestSendAlert?
+    @Published var hasCompletedSetup = false
+    @Published var readinessByTarget: [TargetKind: TargetReadiness] = [:]
 
     init(
         scheduler: SendScheduler,
         immediateSend: ImmediateSending,
         permission: AccessibilityPermissionManaging,
-        notifier: UserNotifying
+        notifier: UserNotifying,
+        query: ApplicationQuerying,
+        firstRun: FirstRunPersisting = UserDefaultsFirstRunStore()
     ) {
         self.scheduler = scheduler
         self.immediateSend = immediateSend
         self.permission = permission
         self.notifier = notifier
+        self.query = query
+        self.firstRun = firstRun
         self.snapshot = scheduler.snapshot
         self.accessibilityStatus = permission.status()
+        self.hasCompletedSetup = firstRun.hasCompletedSetup
         if let target = scheduler.selectedTarget {
             selectedTarget = target
         }
@@ -44,10 +54,43 @@ final class SchedulerController: ObservableObject {
             }
         }
         refresh()
+        refreshTargetReadiness()
+    }
+
+    var form: ScheduleForm {
+        ScheduleForm(
+            target: selectedTarget,
+            mode: mode,
+            hours: hours,
+            minutes: minutes,
+            exactDate: exactDate,
+            postSendKeepAwake: postSendKeepAwake
+        )
+    }
+
+    func session(at now: Date = Date()) -> PopoverSession {
+        PopoverSession(
+            snapshot: snapshot,
+            form: form,
+            accessibilityStatus: accessibilityStatus,
+            selectedReadiness: readiness(for: selectedTarget),
+            hasCompletedSetup: hasCompletedSetup,
+            isTestSending: isTestSending,
+            lastImmediateOutcome: lastImmediateOutcome,
+            now: now
+        )
+    }
+
+    func readiness(for kind: TargetKind) -> TargetReadiness {
+        readinessByTarget[kind] ?? .unknown(kind)
     }
 
     func refresh() {
         snapshot = scheduler.snapshot
+        if snapshot.restoredFromPersistence {
+            firstRun.hasCompletedSetup = true
+            hasCompletedSetup = true
+        }
         if let target = snapshot.target {
             selectedTarget = target
         }
@@ -61,6 +104,24 @@ final class SchedulerController: ObservableObject {
         accessibilityStatus = permission.status()
     }
 
+    func refreshTargetReadiness() {
+        readinessByTarget = TargetReadinessCatalog.collect(
+            query: query,
+            permission: permission.status()
+        )
+    }
+
+    func refreshUserFacingState() {
+        refreshPermission()
+        refreshTargetReadiness()
+        refresh()
+    }
+
+    func acknowledgeSetup() {
+        firstRun.hasCompletedSetup = true
+        hasCompletedSetup = true
+    }
+
     func requestAccessibility() {
         permission.requestTrust()
         refreshPermission()
@@ -70,20 +131,31 @@ final class SchedulerController: ObservableObject {
         permission.openPrivacySettings()
     }
 
-    func arm() {
+    func armTapped() {
         armErrorMessage = nil
-        let request: ScheduleRequest
-        switch mode {
-        case .relative:
-            request = .relative(hours: hours, minutes: minutes)
-        case .exact:
-            request = .exact(exactDate)
+        let session = session(at: Date())
+        if let reason = session.presentation.armBlockedReason {
+            armErrorMessage = reason
+            return
         }
+        if session.presentation.needsImminentConfirmation {
+            confirmImminentArm = true
+            return
+        }
+        performArm()
+    }
 
+    func confirmAndArm() {
+        confirmImminentArm = false
+        performArm()
+    }
+
+    func performArm() {
+        armErrorMessage = nil
         do {
             try scheduler.arm(
                 target: selectedTarget,
-                request: request,
+                request: form.request,
                 postSendKeepAwake: postSendKeepAwake
             )
             refresh()
@@ -108,73 +180,67 @@ final class SchedulerController: ObservableObject {
             lastImmediateOutcome = nil
             confirmTestSend = false
         }
-        try? await Task.sleep(nanoseconds: 250_000_000)
         let outcome = await immediateSend.sendNow(to: selectedTarget)
         await MainActor.run {
             lastImmediateOutcome = outcome
             isTestSending = false
-            refresh()
-            refreshPermission()
-            presentTestSendResult(outcome)
+            refreshUserFacingState()
+            testSendAlert = TestSendAlert(outcome: outcome)
         }
-    }
-
-    private func presentTestSendResult(_ outcome: SendOutcome) {
-        let alert = NSAlert()
-        alert.messageText = "Test Send"
-        switch outcome {
-        case .verifiedSent:
-            alert.alertStyle = .informational
-            alert.informativeText = "DawnSend verified that the draft was submitted."
-        case .issuedButNotVerifiable:
-            alert.alertStyle = .informational
-            alert.informativeText = "DawnSend issued Submit, but could not verify it from the accessibility tree. Check the chat to confirm."
-        case .failed(let message):
-            alert.alertStyle = .warning
-            alert.informativeText = message
-        }
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
     }
 
     var canArm: Bool {
-        switch snapshot.status {
-        case .idle, .sent, .missed, .failed:
-            if mode == .relative {
-                return hours > 0 || minutes > 0
-            }
-            return true
-        case .armed, .sending:
-            return false
-        }
+        session().presentation.canArm
     }
 
     var canDisarm: Bool {
-        snapshot.status == .armed
-            || snapshot.status == .sending
-            || snapshot.isPowerAssertionHeld
-            || snapshot.status == .sent
-            || snapshot.status == .failed
-            || snapshot.status == .missed
+        session().presentation.canDisarm
     }
 
     var canTestSend: Bool {
-        snapshot.status != .sending && !isTestSending
+        session().presentation.canTestSend
     }
 }
 
-enum ScheduleMode: String, CaseIterable, Identifiable {
-    case relative
-    case exact
+enum TestSendAlert: Identifiable, Equatable {
+    case verified
+    case unverified
+    case failed(String)
 
-    var id: String { rawValue }
-
-    var displayName: String {
+    var id: String {
         switch self {
-        case .relative:
-            return "Send in"
-        case .exact:
-            return "Exact time"
+        case .verified:
+            return "verified"
+        case .unverified:
+            return "unverified"
+        case .failed(let message):
+            return "failed-\(message)"
+        }
+    }
+
+    var title: String {
+        "Test Send"
+    }
+
+    var message: String {
+        switch self {
+        case .verified:
+            return "DawnSend verified that the draft was submitted."
+        case .unverified:
+            return "DawnSend issued Submit, but could not verify it from the accessibility tree. Check the chat to confirm."
+        case .failed(let message):
+            return message
+        }
+    }
+
+    init(outcome: SendOutcome) {
+        switch outcome {
+        case .verifiedSent:
+            self = .verified
+        case .issuedButNotVerifiable:
+            self = .unverified
+        case .failed(let message):
+            self = .failed(message)
         }
     }
 }

@@ -1,12 +1,10 @@
 # DawnSend
 
-**Work in progress.** This repository is not a finished product yet.
-
 Keep the Mac awake. Hit Send at the time you choose.
 
-DawnSend will be a native macOS menu-bar utility that keeps the Mac awake and, at a time you choose, submits a message you already drafted in Codex, Cursor, or Claude Cowork.
+DawnSend is a native macOS menu-bar utility that keeps the Mac awake and, at a time you choose, submits a message you already drafted in Codex, Cursor, or Claude Cowork.
 
-V1 is local-only, MIT-licensed, and distributed from GitHub Releases. It will not include a Mac App Store build, accounts, servers, analytics, telemetry, or prompt capture.
+V1 is local-only, MIT-licensed, and distributed from GitHub Releases. It does not include a Mac App Store build, accounts, servers, analytics, telemetry, or prompt capture.
 
 ## Requirements
 
@@ -38,7 +36,7 @@ killall DawnSend
 
 ## Status
 
-The current tree includes the scheduler, native keep-awake assertions, and a local Send pipeline for Codex, Cursor, and Claude Cowork. The menu-bar experience is still a later stage.
+The menu-bar popover is wired to the scheduler, keep-awake assertions, and local Send pipeline. Choose Codex, Cursor, or Claude Cowork, set an exact date/time or a relative delay, then Arm. DawnSend acts on the already-open conversation and focused draft. V1 does not keep the Mac awake with the lid closed or the Mac locked.
 
 Diagnose detected apps without sending:
 

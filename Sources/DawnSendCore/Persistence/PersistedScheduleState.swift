@@ -12,6 +12,7 @@ public struct PersistedScheduleState: Codable, Equatable, Sendable {
     public var sendAttempted: Bool
     public var postSendEndsAt: Date?
     public var lastErrorMessage: String?
+    public var lastSendVerification: SendVerification?
 
     public init(
         schemaVersion: Int = PersistedScheduleState.currentSchemaVersion,
@@ -21,7 +22,8 @@ public struct PersistedScheduleState: Codable, Equatable, Sendable {
         postSendKeepAwake: PostSendKeepAwake = .default,
         sendAttempted: Bool = false,
         postSendEndsAt: Date? = nil,
-        lastErrorMessage: String? = nil
+        lastErrorMessage: String? = nil,
+        lastSendVerification: SendVerification? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.target = target
@@ -31,6 +33,7 @@ public struct PersistedScheduleState: Codable, Equatable, Sendable {
         self.sendAttempted = sendAttempted
         self.postSendEndsAt = postSendEndsAt
         self.lastErrorMessage = lastErrorMessage
+        self.lastSendVerification = lastSendVerification
     }
 
     public init(from decoder: Decoder) throws {
@@ -43,5 +46,6 @@ public struct PersistedScheduleState: Codable, Equatable, Sendable {
         sendAttempted = try container.decodeIfPresent(Bool.self, forKey: .sendAttempted) ?? false
         postSendEndsAt = try container.decodeIfPresent(Date.self, forKey: .postSendEndsAt)
         lastErrorMessage = try container.decodeIfPresent(String.self, forKey: .lastErrorMessage)
+        lastSendVerification = try container.decodeIfPresent(SendVerification.self, forKey: .lastSendVerification)
     }
 }

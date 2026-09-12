@@ -20,6 +20,8 @@ public final class SendScheduler: Scheduling {
     private var _sendAttempted = false
     private var _lastErrorMessage: String?
     private var _lastPowerError: PowerAssertionError?
+    private var _lastSendVerification: SendVerification?
+    private var _restoredFromPersistence = false
     private var _disarmAfterSend = false
     private var generation = UUID()
 
@@ -82,6 +84,8 @@ public final class SendScheduler: Scheduling {
                 sendAttempted: _sendAttempted,
                 lastErrorMessage: _lastErrorMessage,
                 lastPowerError: _lastPowerError,
+                lastSendVerification: _lastSendVerification,
+                restoredFromPersistence: _restoredFromPersistence,
                 isPowerAssertionHeld: power.isHeld,
                 lidClosedSupported: LidClosedCapability.isSupported
             )
@@ -145,6 +149,8 @@ public final class SendScheduler: Scheduling {
             _postSendEndsAt = nil
             _sendAttempted = false
             _lastErrorMessage = nil
+            _lastSendVerification = nil
+            _restoredFromPersistence = false
             _status = .armed
             persistLocked()
             scheduleLocked(at: deadline)
@@ -159,23 +165,17 @@ public final class SendScheduler: Scheduling {
     }
 
     public func disarm() {
-        var notifyEnded = false
         withLock {
             if _status == .sending {
                 _disarmAfterSend = true
                 return
             }
 
-            let wasHoldingPostSend = _status == .sent || _status == .failed || _status == .missed
             generation = UUID()
             timer.cancel()
             goIdleLocked(clearDeadline: true)
             persistLocked()
-            notifyEnded = wasHoldingPostSend && power.isHeld
             releasePowerLocked()
-        }
-        if notifyEnded {
-            notifier.notify(.postSendKeepAwakeEnded)
         }
         emitChange()
     }
@@ -207,11 +207,14 @@ public final class SendScheduler: Scheduling {
             _target = loaded.target
             _postSendKeepAwake = loaded.postSendKeepAwake
             _lastErrorMessage = loaded.lastErrorMessage
+            _lastSendVerification = loaded.lastSendVerification
+            _restoredFromPersistence = loaded.status != .idle
 
             switch loaded.status {
             case .idle:
                 goIdleLocked(clearDeadline: true)
                 _target = loaded.target
+                _restoredFromPersistence = false
                 persistLocked()
 
             case .armed:
@@ -305,6 +308,16 @@ public final class SendScheduler: Scheduling {
         }
     }
 
+    public func cancelScheduleForTermination() {
+        withLock {
+            generation = UUID()
+            timer.cancel()
+            goIdleLocked(clearDeadline: true)
+            persistLocked()
+            releasePowerLocked()
+        }
+    }
+
     private var shouldHoldPostSend: Bool {
         withLock {
             guard _postSendKeepAwake.shouldHoldAfterSend else {
@@ -379,14 +392,17 @@ public final class SendScheduler: Scheduling {
             case .verifiedSent:
                 _status = .sent
                 _lastErrorMessage = nil
+                _lastSendVerification = .verified
                 event = .verifiedSent(target: target)
             case .issuedButNotVerifiable:
                 _status = .sent
                 _lastErrorMessage = nil
+                _lastSendVerification = .issuedButNotVerifiable
                 event = .issuedButNotVerifiable(target: target)
             case .failed(let message):
                 _status = .failed
                 _lastErrorMessage = message
+                _lastSendVerification = nil
                 event = .failed(target: target, message: message)
             }
 
@@ -461,6 +477,7 @@ public final class SendScheduler: Scheduling {
         _status = .missed
         _sendAttempted = false
         _postSendEndsAt = nil
+        _lastSendVerification = nil
         _lastErrorMessage = "DawnSend relaunched after the deadline and did not submit a stale draft."
         persistLocked()
         releasePowerLocked()
@@ -472,6 +489,7 @@ public final class SendScheduler: Scheduling {
         _status = .failed
         _sendAttempted = true
         _postSendEndsAt = nil
+        _lastSendVerification = nil
         _lastErrorMessage = message
         persistLocked()
         releasePowerLocked()
@@ -482,6 +500,8 @@ public final class SendScheduler: Scheduling {
         _status = .idle
         _sendAttempted = false
         _postSendEndsAt = nil
+        _lastSendVerification = nil
+        _restoredFromPersistence = false
         _disarmAfterSend = false
         if clearDeadline {
             _deadline = nil
@@ -503,7 +523,8 @@ public final class SendScheduler: Scheduling {
             postSendKeepAwake: _postSendKeepAwake,
             sendAttempted: _sendAttempted,
             postSendEndsAt: _postSendEndsAt,
-            lastErrorMessage: _lastErrorMessage
+            lastErrorMessage: _lastErrorMessage,
+            lastSendVerification: _lastSendVerification
         )
         do {
             try store.save(state)

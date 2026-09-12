@@ -8,9 +8,11 @@ struct DawnSendApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        MenuBarExtra(AppIdentity.displayName, systemImage: "clock") {
+        MenuBarExtra {
             MenuBarRootView()
                 .environmentObject(appDelegate.services.controller)
+        } label: {
+            MenuBarStatusItem(controller: appDelegate.services.controller)
         }
         .menuBarExtraStyle(.window)
     }
@@ -36,7 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case .denied:
                     line = "Notifications: denied (System Settings › Notifications › DawnSend)"
                 case .notDetermined:
-                    line = "Notifications: not determined (asked once on Arm or Test Send)"
+                    line = "Notifications: not determined (asked on Arm or Test Send)"
                 @unknown default:
                     line = "Notifications: unknown"
                 }
@@ -46,12 +48,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         services.scheduler.restorePersistedState()
-        services.controller.refresh()
-        services.controller.refreshPermission()
+        services.controller.refreshUserFacingState()
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        services.controller.refreshUserFacingState()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        let snapshot = services.scheduler.snapshot
+        if TerminationPolicy.shouldConfirm(status: snapshot.status) {
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = TerminationPolicy.title
+            alert.informativeText = TerminationPolicy.message(
+                target: snapshot.target,
+                deadline: snapshot.deadline,
+                status: snapshot.status
+            )
+            alert.addButton(withTitle: TerminationPolicy.confirmButtonTitle)
+            alert.addButton(withTitle: TerminationPolicy.cancelButtonTitle)
+            NSApp.activate(ignoringOtherApps: true)
+            let response = alert.runModal()
+            if response != .alertFirstButtonReturn {
+                return .terminateCancel
+            }
+            services.scheduler.cancelScheduleForTermination()
+            return .terminateNow
+        }
+        services.scheduler.prepareForTermination()
+        return .terminateNow
     }
 
     func applicationWillTerminate(_ notification: Notification) {

@@ -41,7 +41,8 @@ final class AppServices {
             scheduler: scheduler,
             immediateSend: immediateSend,
             permission: permission,
-            notifier: notifier
+            notifier: notifier,
+            query: query
         )
         self.clockMonitor = SystemClockChangeMonitor { [weak scheduler] in
             scheduler?.handleClockOrTimeZoneChange()

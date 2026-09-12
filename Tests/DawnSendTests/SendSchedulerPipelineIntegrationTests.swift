@@ -24,6 +24,7 @@ final class SendSchedulerPipelineIntegrationTests: XCTestCase {
         XCTAssertEqual(harness.scheduler.status, .sent)
         XCTAssertFalse(harness.power.isHeld)
         XCTAssertEqual(harness.notifier.events, [.verifiedSent(target: .cursor)])
+        XCTAssertEqual(harness.scheduler.snapshot.lastSendVerification, .verified)
 
         harness.timer.fire()
         harness.scheduler.handleClockOrTimeZoneChange()
@@ -51,6 +52,7 @@ final class SendSchedulerPipelineIntegrationTests: XCTestCase {
 
         XCTAssertEqual(harness.sendExecutor.lastOutcome, .issuedButNotVerifiable)
         XCTAssertEqual(harness.notifier.events, [.issuedButNotVerifiable(target: .codex)])
+        XCTAssertEqual(harness.scheduler.snapshot.lastSendVerification, .issuedButNotVerifiable)
         XCTAssertFalse(harness.power.isHeld)
     }
 

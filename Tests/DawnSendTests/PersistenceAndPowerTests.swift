@@ -64,6 +64,7 @@ final class PersistenceAndPowerTests: XCTestCase {
         XCTAssertEqual(decoded.postSendKeepAwake, .fiveHours)
         XCTAssertFalse(decoded.sendAttempted)
         XCTAssertNil(decoded.postSendEndsAt)
+        XCTAssertNil(decoded.lastSendVerification)
     }
 
     func testPowerAssertionReleasedOnDisarm() throws {

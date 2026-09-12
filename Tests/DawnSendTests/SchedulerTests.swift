@@ -132,6 +132,7 @@ final class SchedulerTests: XCTestCase {
         XCTAssertEqual(restored.timer.nextDeadline, deadline)
         XCTAssertTrue(restored.power.isHeld)
         XCTAssertEqual(restored.sendExecutor.sendCount, 0)
+        XCTAssertTrue(restored.scheduler.snapshot.restoredFromPersistence)
     }
 
     func testStaleStateRestorationBecomesMissedWithoutSending() throws {
@@ -155,6 +156,8 @@ final class SchedulerTests: XCTestCase {
         XCTAssertFalse(harness.power.isHeld)
         XCTAssertEqual(harness.notifier.events, [.missed(target: .cursor)])
         XCTAssertEqual(try store.load()?.status, .missed)
+        XCTAssertTrue(harness.scheduler.snapshot.restoredFromPersistence)
+        XCTAssertNil(harness.scheduler.snapshot.lastSendVerification)
     }
 
     func testNoDuplicateSendAfterRelaunch() async throws {
@@ -269,6 +272,42 @@ final class SchedulerTests: XCTestCase {
     func testLidClosedSupportIsExplicitlyUnsupported() {
         XCTAssertFalse(LidClosedCapability.isSupported)
         XCTAssertFalse(SchedulerHarness.make().scheduler.snapshot.lidClosedSupported)
+    }
+
+    func testQuitWhileArmedCancelsWithoutSendingAndReleasesPower() throws {
+        let harness = SchedulerHarness.make()
+        try harness.scheduler.arm(
+            target: .cursor,
+            request: .relative(300),
+            postSendKeepAwake: .fiveHours
+        )
+        XCTAssertTrue(harness.power.isHeld)
+        XCTAssertEqual(harness.scheduler.status, .armed)
+
+        harness.scheduler.cancelScheduleForTermination()
+
+        XCTAssertEqual(harness.scheduler.status, .idle)
+        XCTAssertNil(harness.scheduler.deadline)
+        XCTAssertFalse(harness.power.isHeld)
+        XCTAssertEqual(harness.power.releaseCount, 1)
+        XCTAssertNil(harness.timer.nextDeadline)
+        XCTAssertEqual(try harness.store.load()?.status, .idle)
+        harness.clock.advance(by: 300)
+        harness.timer.fire()
+        XCTAssertEqual(harness.sendExecutor.sendCount, 0)
+    }
+
+    func testPrepareForTerminationReleasesPowerWithoutClearingArmedState() throws {
+        let harness = SchedulerHarness.make()
+        try harness.scheduler.arm(
+            target: .codex,
+            request: .relative(120),
+            postSendKeepAwake: .off
+        )
+        harness.scheduler.prepareForTermination()
+        XCTAssertFalse(harness.power.isHeld)
+        XCTAssertEqual(harness.scheduler.status, .armed)
+        XCTAssertEqual(try harness.store.load()?.status, .armed)
     }
 
     private func waitUntil(

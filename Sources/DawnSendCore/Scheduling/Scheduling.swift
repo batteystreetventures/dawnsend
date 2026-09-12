@@ -20,4 +20,6 @@ public protocol Scheduling: AnyObject {
     func restorePersistedState()
     func handleClockOrTimeZoneChange()
     func prepareForTermination()
+    /// Cancels an armed or in-flight send, persists idle, and releases assertions. Used when the user confirms Quit.
+    func cancelScheduleForTermination()
 }

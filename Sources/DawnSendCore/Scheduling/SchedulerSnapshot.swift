@@ -10,6 +10,8 @@ public struct SchedulerSnapshot: Equatable, Sendable {
     public var sendAttempted: Bool
     public var lastErrorMessage: String?
     public var lastPowerError: PowerAssertionError?
+    public var lastSendVerification: SendVerification?
+    public var restoredFromPersistence: Bool
     public var isPowerAssertionHeld: Bool
     public var lidClosedSupported: Bool
 
@@ -22,6 +24,8 @@ public struct SchedulerSnapshot: Equatable, Sendable {
         sendAttempted: Bool = false,
         lastErrorMessage: String? = nil,
         lastPowerError: PowerAssertionError? = nil,
+        lastSendVerification: SendVerification? = nil,
+        restoredFromPersistence: Bool = false,
         isPowerAssertionHeld: Bool = false,
         lidClosedSupported: Bool = LidClosedCapability.isSupported
     ) {
@@ -33,6 +37,8 @@ public struct SchedulerSnapshot: Equatable, Sendable {
         self.sendAttempted = sendAttempted
         self.lastErrorMessage = lastErrorMessage
         self.lastPowerError = lastPowerError
+        self.lastSendVerification = lastSendVerification
+        self.restoredFromPersistence = restoredFromPersistence
         self.isPowerAssertionHeld = isPowerAssertionHeld
         self.lidClosedSupported = lidClosedSupported
     }
